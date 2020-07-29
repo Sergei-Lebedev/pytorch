@@ -25,7 +25,7 @@ from . import PrefixStore
 _MPI_AVAILABLE = True
 _NCCL_AVAILABLE = True
 _GLOO_AVAILABLE = True
-
+_UCX_AVAILABLE = True
 
 try:
     from. import ProcessGroupMPI
@@ -42,6 +42,10 @@ try:
 except ImportError:
     _GLOO_AVAILABLE = False
 
+try:
+    from. import ProcessGroupUCX
+except ImportError:
+    _UCX_AVAILABLE = False
 
 class Backend(object):
     """
@@ -65,6 +69,7 @@ class Backend(object):
     NCCL = "nccl"
     MPI = "mpi"
     TCP = "tcp"
+    UCX = "ucx"
 
     def __new__(cls, name):
         if not isinstance(name, string_classes):
@@ -77,7 +82,7 @@ class Backend(object):
                              "on CPU tensors.")
         elif value == Backend.UNDEFINED:
             raise ValueError("Invalid backend: '{}'".format(name))
-        elif value != Backend.GLOO and value != Backend.NCCL and value != Backend.MPI:
+        elif value != Backend.GLOO and value != Backend.NCCL and value != Backend.MPI and value != Backend.UCX:
             value = name
         return value
 
@@ -267,6 +272,11 @@ def is_gloo_available():
     """
     return _GLOO_AVAILABLE
 
+def is_ucx_available():
+    """
+    Checks if the Gloo backend is available.
+    """    
+    return _UCX_AVAILABLE
 
 def is_initialized():
     """
@@ -513,6 +523,14 @@ def _new_process_group_helper(world_size,
                 world_size,
                 timeout)
             _pg_map[pg] = (Backend.NCCL, store)
+            _pg_names[pg] = group_name
+        elif backend == Backend.UCX:
+            pg = ProcessGroupUCX(
+                prefix_store,
+                rank,
+                world_size,
+                timeout)
+            _pg_map[pg] = (Backend.UCX, store)
             _pg_names[pg] = group_name
         else:
             pg = getattr(Backend, backend.upper())(
