@@ -1,5 +1,8 @@
 #include <c10d/ProcessGroupUCX.hpp>
 
+#include <c10/cuda/CUDAGuard.h>
+#include <cuda.h>
+
 namespace c10d {
 
 bool ProcessGroupUCX::WorkUCX::isCompleted()
@@ -113,7 +116,13 @@ void ProcessGroupUCX::progress_loop()
     std::unique_lock<std::mutex> lock(pg_mutex);
     torch_ucx_coll_request_t     *req;
     torch_ucx_status_t           st;
- 
+
+#ifdef USE_CUDA
+    auto device = c10::Device(c10::DeviceType::CUDA, (c10::DeviceIndex)0);
+    at::cuda::OptionalCUDAGuard  guard(device);
+    cudaSetDevice(0);
+#endif
+
     while(!stop_progress_loop) {
         if (progress_queue.empty()) {
             queue_produce_cv.wait(lock);
@@ -123,9 +132,16 @@ void ProcessGroupUCX::progress_loop()
         progress_queue.pop_front();
         lock.unlock();
         queue_consume_cv.notify_one();
-        do {
-            st = torch_ucx_coll_test(req);
-        } while(st == TORCH_UCX_INPROGRESS);
+        {
+#ifdef USE_CUDA
+            guard.set_index(req->dev_index);
+#endif
+            auto device = c10::Device(req->dev_type, req->dev_index);
+            c10::DeviceGuard guard(device);
+            do {
+                st = torch_ucx_coll_test(req);
+            } while(st == TORCH_UCX_INPROGRESS);
+        }
         lock.lock();
     }
 }
@@ -268,6 +284,9 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupUCX::alltoall_base(
   req->dst_buf_mtype = outputTensor.is_cuda() ? TORCH_UCX_CUDA: TORCH_UCX_HOST;
   req->src_buffer    = inputTensor.data_ptr();
   req->dst_buffer    = outputTensor.data_ptr();
+  req->dev_index     = inputTensor.device().index();
+  req->dev_type      = inputTensor.device().type();
+
   if ((outputSplitSizes.size() == 0) || (inputSplitSizes.size() == 0)) {
     req->len           = inputTensor.element_size() * inputTensor.numel() / size_;
     torch_ucx_alltoall_start(ucx_coll_comm, request->req);
