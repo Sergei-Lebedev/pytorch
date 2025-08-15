@@ -1,3 +1,4 @@
+#include <iterator>
 #ifdef USE_C10D_UCC
 
 #include <ATen/cuda/nvrtc_stub/ATenNVRTC.h>
@@ -1465,22 +1466,35 @@ c10::intrusive_ptr<Work> ProcessGroupUCC::_reduce_scatter_base(
   check_tensor({inputTensor});
   initComm(outputTensor.device());
 
-  auto data = std::make_unique<WorkData>();
+  ReduceScattervWorkData* data = new ReduceScattervWorkData(size_);
 
   ucc_coll_args_t coll;
   coll.mask = 0;
   coll.flags = 0;
-  coll.coll_type = UCC_COLL_TYPE_REDUCE_SCATTER;
   coll.op = to_ucc_reduceOp(opts.reduceOp, inputTensor.scalar_type());
 
   coll.src.info.buffer = inputTensor.data_ptr();
   coll.src.info.count = inputTensor.numel();
   coll.src.info.datatype = ucc_dtype_map.at(inputTensor.scalar_type());
   coll.src.info.mem_type = to_ucc_memType(inputTensor.device().type());
-  coll.dst.info.buffer = outputTensor.data_ptr();
-  coll.dst.info.count = outputTensor.numel();
-  coll.dst.info.datatype = ucc_dtype_map.at(outputTensor.scalar_type());
-  coll.dst.info.mem_type = to_ucc_memType(outputTensor.device().type());
+
+  if (opts.counts.size() == 0) {
+    coll.coll_type = UCC_COLL_TYPE_REDUCE_SCATTER;
+    coll.dst.info.buffer = outputTensor.data_ptr();
+    coll.dst.info.count = outputTensor.numel();
+    coll.dst.info.datatype = ucc_dtype_map.at(outputTensor.scalar_type());
+    coll.dst.info.mem_type = to_ucc_memType(outputTensor.device().type());
+  } else {
+    std::copy(opts.counts.begin(), opts.counts.end(), data->recv_lengths.begin());
+
+    coll.mask = UCC_COLL_ARGS_FIELD_FLAGS;
+    coll.flags = UCC_COLL_ARGS_FLAG_COUNT_64BIT;
+    coll.coll_type = UCC_COLL_TYPE_REDUCE_SCATTERV;
+    coll.dst.info_v.buffer = outputTensor.data_ptr();
+    coll.dst.info_v.counts = (ucc_count_t*)data->recv_lengths.data();
+    coll.dst.info_v.datatype = ucc_dtype_map.at(outputTensor.scalar_type());
+    coll.dst.info_v.mem_type = to_ucc_memType(outputTensor.device().type());
+  }
 
   std::vector<at::Tensor> inputTensors = {inputTensor};
   std::vector<at::Tensor> outputTensors = {outputTensor};
@@ -1492,7 +1506,7 @@ c10::intrusive_ptr<Work> ProcessGroupUCC::_reduce_scatter_base(
       []() {},
       []() {},
       coll,
-      std::move(data),
+      std::unique_ptr<WorkData>(data),
       outputTensor.device(),
       inputTensors,
       outputTensors,

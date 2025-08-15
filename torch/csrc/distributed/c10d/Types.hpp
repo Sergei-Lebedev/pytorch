@@ -157,6 +157,7 @@ struct ReduceScatterOptions {
   ReduceOp reduceOp = ReduceOp::SUM;
   std::chrono::milliseconds timeout = kUnsetTimeout;
   bool asyncOp = true;
+  std::vector<int64_t> counts;
 };
 
 struct AllToAllOptions {

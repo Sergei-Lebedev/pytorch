@@ -171,6 +171,7 @@ class ReduceScatterOptions:
     reduceOp: ReduceOp
     timeout: timedelta
     asyncOp: bool
+    counts: list[int]
 
 class BarrierOptions:
     device_ids: list[int]

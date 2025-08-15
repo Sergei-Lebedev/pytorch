@@ -4360,7 +4360,7 @@ def reduce_scatter(output, input_list, op=ReduceOp.SUM, group=None, async_op=Fal
 
 
 @_exception_logger
-def reduce_scatter_tensor(output, input, op=ReduceOp.SUM, group=None, async_op=False):
+def reduce_scatter_tensor(output, input, op=ReduceOp.SUM, group=None, async_op=False, counts=None):
     """
     Reduces, then scatters a tensor to all ranks in a group.
 
@@ -4436,9 +4436,10 @@ def reduce_scatter_tensor(output, input, op=ReduceOp.SUM, group=None, async_op=F
     opts = ReduceScatterOptions()
     opts.reduceOp = op
     opts.asyncOp = async_op
+    opts.counts = counts
 
     group = group or _get_default_group()
-
+    print(f"rank {group.rank()} is calling reduce_scatter_tensor with counts {counts}")
     # Check if we are in coalescing context
     # If we are, do not issue single operation, just append a collective representation
     if group in _world.pg_coalesce_state.keys():

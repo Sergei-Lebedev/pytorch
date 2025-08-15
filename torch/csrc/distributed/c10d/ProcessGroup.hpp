@@ -555,6 +555,7 @@ class TORCH_API ProcessGroup : public torch::CustomClassHolder {
                 at::Tensor&,
                 const c10::intrusive_ptr<::c10d::ProcessGroup>&,
                 const c10::intrusive_ptr<::c10d::ReduceOp>&,
+                const std::vector<int64_t>&,
                 bool,
                 int64_t)>();
     auto work = std::get<1>(op.call(
@@ -562,6 +563,7 @@ class TORCH_API ProcessGroup : public torch::CustomClassHolder {
         inputBuffer,
         c10::intrusive_ptr<ProcessGroup>::unsafe_reclaim_from_nonowning(this),
         c10::make_intrusive<::c10d::ReduceOp>(opts.reduceOp),
+        opts.counts,
         opts.asyncOp,
         opts.timeout.count()));
 

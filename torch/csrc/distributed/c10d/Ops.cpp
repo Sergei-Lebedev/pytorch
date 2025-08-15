@@ -33,7 +33,7 @@ TORCH_LIBRARY(c10d, m) {
   m.def(
       "reduce_scatter_(Tensor[] output_tensors, Tensor[][] input_tensors, __torch__.torch.classes.c10d.ProcessGroup process_group, __torch__.torch.classes.c10d.ReduceOp reduce_op, bool async_op=True, int timeout=-1) -> (Tensor[], __torch__.torch.classes.c10d.Work)");
   m.def(
-      "_reduce_scatter_base_(Tensor output_tensor, Tensor input_tensor, __torch__.torch.classes.c10d.ProcessGroup process_group, __torch__.torch.classes.c10d.ReduceOp reduce_op, bool async_op=True, int timeout=-1) -> (Tensor, __torch__.torch.classes.c10d.Work)");
+      "_reduce_scatter_base_(Tensor output_tensor, Tensor input_tensor, __torch__.torch.classes.c10d.ProcessGroup process_group, __torch__.torch.classes.c10d.ReduceOp reduce_op, int[] counts,bool async_op=True, int timeout=-1) -> (Tensor, __torch__.torch.classes.c10d.Work)");
   m.def(
       "reduce_scatter_tensor_coalesced_(Tensor[] outputs, Tensor[] inputs, __torch__.torch.classes.c10d.ProcessGroup process_group, __torch__.torch.classes.c10d.ReduceOp reduce_op, bool async_op=True, int timeout=-1) -> __torch__.torch.classes.c10d.Work");
   m.def(
@@ -330,6 +330,7 @@ IMPL_REDUCE_SCATTER(PrivateUse1)
       at::Tensor& input_tensor,                                                \
       const c10::intrusive_ptr<ProcessGroup>& process_group,                   \
       const c10::intrusive_ptr<ReduceOp>& reduce_op,                           \
+      const std::vector<int64_t>& counts,                                      \
       bool asyncOp,                                                            \
       int64_t timeout) {                                                       \
     auto work = process_group->getBackend(c10::DeviceType::DEV)                \
@@ -339,7 +340,7 @@ IMPL_REDUCE_SCATTER(PrivateUse1)
                         ReduceScatterOptions{                                  \
                             *reduce_op.get(),                                  \
                             std::chrono::milliseconds(timeout),                \
-                            asyncOp});                                         \
+                            asyncOp, counts});                                 \
     return std::tuple<at::Tensor, c10::intrusive_ptr<Work>>(                   \
         output_tensor, work);                                                  \
   }

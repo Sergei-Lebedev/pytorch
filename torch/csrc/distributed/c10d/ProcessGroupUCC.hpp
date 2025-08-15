@@ -93,6 +93,12 @@ class TORCH_API ProcessGroupUCC : public Backend {
     std::vector<uint64_t> send_offsets;
   };
 
+  class ReduceScattervWorkData : public WorkData {
+   public:
+    ReduceScattervWorkData(int size) : recv_lengths(size) {}
+    std::vector<uint64_t> recv_lengths;
+  };
+
   class ProgressEntry {
     friend class ProcessGroupUCC;
     friend class Comm;
