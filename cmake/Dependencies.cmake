@@ -1104,6 +1104,7 @@ if(USE_UCC)
     caffe2_update_option(USE_UCC OFF)
   else()
     include(${CMAKE_CURRENT_LIST_DIR}/External/ucc.cmake)
+    list(APPEND Caffe2_DEPENDENCY_LIBS __caffe2_ucc)
   endif()
 endif()
 
